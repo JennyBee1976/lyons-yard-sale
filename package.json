@@ -12,22 +12,22 @@
     "node": "20.x"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "next": "14.2.16",
+    "@stripe/stripe-js": "^2.4.0",
     "@supabase/supabase-js": "^2.39.3",
-    "@stripe/stripe-js": "^2.4.0"
+    "next": "^14.2.31",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.1",
     "eslint": "8.56.0",
     "eslint-config-next": "14.2.16",
+    "glob": "^10.3.10",
+    "postcss": "^8.4.38",
     "rimraf": "^5.0.5",
-    "glob": "^10.3.10"
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.4.5"
   }
 }
