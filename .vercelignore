@@ -1,0 +1,5 @@
+# .vercelignore
+supabase/functions_backup/
+supabase/functions/
+*.zip
+node_modules/
