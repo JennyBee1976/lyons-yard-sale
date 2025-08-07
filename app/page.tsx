@@ -17,7 +17,7 @@ export default function Home() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center gap-6 p-8">
       <h1 className="text-3xl font-bold">Lyons Community Yard Sale</h1>
-      <p>Test the Stripe redirect works first, then we’ll restore the full page.</p>
+      <p>Click below to test Stripe Checkout redirect.</p>
       <button
         onClick={goPay}
         className="px-6 py-3 rounded bg-blue-600 text-white hover:bg-blue-700"
