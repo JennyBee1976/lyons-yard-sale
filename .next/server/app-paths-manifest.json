@@ -1,9 +1,0 @@
-{
-  "/admin/page": "app/admin/page.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/create-checkout-session/route": "app/api/create-checkout-session/route.js",
-  "/cancel/page": "app/cancel/page.js",
-  "/page": "app/page.js",
-  "/api/route": "app/api/route.js",
-  "/success/page": "app/success/page.js"
-}
