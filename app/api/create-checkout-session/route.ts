@@ -2,8 +2,8 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-export const runtime = 'nodejs';        // required for stripe SDK
-export const dynamic = 'force-dynamic'; // avoid caching
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const secret = process.env.STRIPE_SECRET_KEY as string;
@@ -13,12 +13,14 @@ if (!secret) {
 const stripe = new Stripe(secret);
 
 export async function GET() {
-  // simple health check for curl
   return NextResponse.json({ ok: true });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    // Use the current deployment’s origin as a safe fallback
+    const origin = process.env.NEXT_PUBLIC_DOMAIN || new URL(req.url).origin;
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -32,8 +34,8 @@ export async function POST() {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_DOMAIN}/success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_DOMAIN}/cancel`,
+      success_url: `${origin}/success`,
+      cancel_url: `${origin}/cancel`,
     });
 
     return NextResponse.json({ url: session.url }, { status: 200 });
