@@ -1,40 +1,46 @@
-import { NextResponse } from "next/server";
-import Stripe from "stripe";
+// app/api/create-checkout-session/route.ts
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+export const runtime = 'nodejs';        // required for stripe SDK
+export const dynamic = 'force-dynamic'; // avoid caching
+export const revalidate = 0;
 
-// Simple ping so we can test with GET
-export async function GET(req: Request) {
-  return NextResponse.json({ ok: true, method: "GET" }, { status: 200 });
+const secret = process.env.STRIPE_SECRET_KEY as string;
+if (!secret) {
+  throw new Error('Missing STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(secret);
+
+export async function GET() {
+  // simple health check for curl
+  return NextResponse.json({ ok: true });
 }
 
-export async function POST(req: Request) {
+export async function POST() {
   try {
-    const origin =
-      process.env.NEXT_PUBLIC_DOMAIN || new URL(req.url).origin;
-
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
+      mode: 'payment',
+      payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
-            currency: "usd",
-            product_data: { name: "Yard Sale Booth Reservation" },
+            currency: 'usd',
             unit_amount: 1000, // $10
+            product_data: { name: 'Yard Sale Booth Reservation' },
           },
           quantity: 1,
         },
       ],
-      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/cancel`,
+      success_url: `${process.env.NEXT_PUBLIC_DOMAIN}/success`,
+      cancel_url: `${process.env.NEXT_PUBLIC_DOMAIN}/cancel`,
     });
 
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (err: any) {
-    console.error("Stripe error:", err?.message || err);
+    console.error('Stripe error:', err);
     return NextResponse.json(
-      { error: err?.message || "Stripe checkout session creation failed." },
+      { error: err?.message ?? 'Stripe checkout session creation failed.' },
       { status: 500 }
     );
   }
