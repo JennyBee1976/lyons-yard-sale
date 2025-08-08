@@ -1,35 +1,27 @@
 // app/api/create-checkout-session/route.ts
-import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { NextResponse } from "next/server";
+import Stripe from "stripe";
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-const secret = process.env.STRIPE_SECRET_KEY as string;
-if (!secret) {
-  throw new Error('Missing STRIPE_SECRET_KEY');
-}
-const stripe = new Stripe(secret);
-
+// Simple GET so we can sanity-check the route in the browser
 export async function GET() {
   return NextResponse.json({ ok: true });
 }
 
+// Create a Checkout Session
 export async function POST(req: Request) {
   try {
-    // Use the current deployment’s origin as a safe fallback
-    const origin = process.env.NEXT_PUBLIC_DOMAIN || new URL(req.url).origin;
-
+    const origin = new URL(req.url).origin; // works on preview + prod
     const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
+      mode: "payment",
+      payment_method_types: ["card"],
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: "usd",
+            product_data: { name: "Yard Sale Booth Reservation" },
             unit_amount: 1000, // $10
-            product_data: { name: 'Yard Sale Booth Reservation' },
           },
           quantity: 1,
         },
@@ -40,9 +32,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (err: any) {
-    console.error('Stripe error:', err);
+    console.error("Stripe error:", err);
     return NextResponse.json(
-      { error: err?.message ?? 'Stripe checkout session creation failed.' },
+      { error: err?.message ?? "Stripe checkout session failed." },
       { status: 500 }
     );
   }
