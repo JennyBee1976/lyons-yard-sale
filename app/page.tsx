@@ -22,7 +22,7 @@ export default function Home() {
     return response.text();
   };
 
-  // hosted Stripe Checkout flow
+  // Hosted Stripe Checkout flow
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
@@ -38,10 +38,10 @@ export default function Home() {
 
     const data = Object.fromEntries(formData.entries());
 
-    // Calculate total amount based on registration type and number of spaces
+    // Calculate total based on registration type and spaces
     const prices = { 'early-bird': 20, 'regular': 30, 'day-of': 40 } as const;
-    const basePrice = prices[(data.registrationType as keyof typeof prices) ?? 'regular'] ?? 30;
-    const numberOfSpaces = parseInt((data.numberOfSpaces as string) || '1', 10) || 1;
+    const basePrice = prices[data.registrationType as keyof typeof prices] ?? 30;
+    const numberOfSpaces = parseInt((data.numberOfSpaces as string) || '1', 10);
     const totalAmount = basePrice * numberOfSpaces;
 
     // Build processed form for Readdy
@@ -53,12 +53,12 @@ export default function Home() {
 
     const registrationTypeLabels: Record<string, string> = {
       'early-bird': 'Early Bird - $20 (First 20 vendors)',
-      'regular': 'Regular - $30',
+      regular: 'Regular - $30',
       'day-of': 'Day Of - $40',
     };
     processedFormData.append(
       'registrationType',
-      registrationTypeLabels[data.registrationType as string] || (data.registrationType as string || '')
+      registrationTypeLabels[data.registrationType as string] || (data.registrationType as string)
     );
 
     const spacesLabels: Record<string, string> = {
@@ -68,33 +68,29 @@ export default function Home() {
     };
     processedFormData.append(
       'numberOfSpaces',
-      spacesLabels[data.numberOfSpaces as string] || (data.numberOfSpaces as string || '1')
+      spacesLabels[data.numberOfSpaces as string] || (data.numberOfSpaces as string)
     );
 
-    processedFormData.append('itemsDescription', (data.itemsDescription as string) || '');
-
-    if (data.agreeToRules === 'on') {
+    processedFormData.append('itemsDescription', ((data.itemsDescription as string) || '').slice(0, 500));
+    if (data.agreeToRules === 'on')
       processedFormData.append('agreeToRules', 'Agreed to follow all vendor rules and park regulations');
-    }
-    if (data.bringOwnSupplies === 'on') {
+    if (data.bringOwnSupplies === 'on')
       processedFormData.append('bringOwnSupplies', 'Understands to bring own tables, blankets, and supplies');
-    }
-
     processedFormData.append('basePrice', `$${basePrice}`);
     processedFormData.append('totalAmount', `$${totalAmount}`);
 
-    // Submit the form first
+    // 1) Submit the form
     setSubmitStatus('Submitting registration...');
     try {
       await submitFormData(processedFormData);
-    } catch (error) {
-      console.error('Form submission error:', error);
+    } catch (err) {
+      console.error('Form submission error:', err);
       setSubmitStatus('Form submission failed. Please try again.');
       setTimeout(() => setSubmitStatus(''), 3000);
       return;
     }
 
-    // 👉 Redirect to Stripe Checkout
+    // 2) Redirect to Stripe Checkout
     setSubmitStatus('Redirecting to payment...');
     try {
       const res = await fetch('/api/create-checkout-session', { method: 'POST' });
@@ -218,6 +214,7 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 mb-16">
+            {/* Pricing */}
             <div className="bg-white rounded-xl shadow-lg p-8">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <i className="ri-price-tag-3-line w-8 h-8 flex items-center justify-center text-blue-600"></i>
@@ -239,6 +236,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Setup Details */}
             <div className="bg-white rounded-xl shadow-lg p-8">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <i className="ri-time-line w-8 h-8 flex items-center justify-center text-green-600"></i>
@@ -269,6 +267,7 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Registration Card */}
             <div className="bg-white rounded-xl shadow-lg p-8">
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <i className="ri-file-list-3-line w-8 h-8 flex items-center justify-center text-orange-600"></i>
@@ -294,6 +293,7 @@ export default function Home() {
           <h2 className="text-4xl font-bold text-gray-900 mb-12 text-center">Rules to Keep Us All Happy</h2>
 
           <div className="grid md:grid-cols-2 gap-12">
+            {/* Vendor Rules */}
             <div className="bg-blue-50 rounded-xl p-8">
               <h3 className="text-2xl font-bold text-blue-900 mb-6 flex items-center gap-3">
                 <i className="ri-store-3-line w-8 h-8 flex items-center justify-center"></i>
@@ -302,9 +302,7 @@ export default function Home() {
               <ul className="space-y-4">
                 <li className="flex items-start gap-3">
                   <i className="ri-checkbox-circle-line w-6 h-6 flex items-center justify-center text-blue-600 mt-0.5"></i>
-                  <span className="text-gray-700">
-                    Check in at registration table before setting up to get your space number
-                  </span>
+                  <span className="text-gray-700">Check in at registration table before setting up to get your space number</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <i className="ri-close-circle-line w-6 h-6 flex items-center justify-center text-red-500 mt-0.5"></i>
@@ -321,6 +319,7 @@ export default function Home() {
               </ul>
             </div>
 
+            {/* Park Rules */}
             <div className="bg-green-50 rounded-xl p-8">
               <h3 className="text-2xl font-bold text-green-900 mb-6 flex items-center gap-3">
                 <i className="ri-leaf-line w-8 h-8 flex items-center justify-center"></i>
