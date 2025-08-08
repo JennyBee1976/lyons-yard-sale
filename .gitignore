@@ -1,9 +1,20 @@
-.DS_Store
+# deps & build
 node_modules/
-.DS_Store
-node_modules/
-.env.local
+.next/
+out/
+dist/
 
-.next
-out
+# env & secrets
+.env
+.env.local
+.env.*.local
+
+# OS / editor
+.DS_Store
+*.log
+
+# local-only (optional)
+supabase/
+
+# misc
 app/page.backup.tsx
