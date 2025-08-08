@@ -1,4 +1,3 @@
-// app/page.tsx
 'use client';
 
 import Link from 'next/link';
@@ -12,25 +11,26 @@ export default function Home() {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // sends the nicely formatted form data to your Readdy endpoint
+  // submits to your Readdy form endpoint first
   const submitFormData = async (formData: FormData) => {
-    const res = await fetch('https://readdy.ai/api/form/d26n70qelq606pbtooeg', {
+    const response = await fetch('https://readdy.ai/api/form/d26n70qelq606pbtooeg', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams(formData as any).toString(),
     });
-    if (!res.ok) throw new Error('Form submission failed');
-    return res.text();
+    if (!response.ok) throw new Error('Form submission failed');
+    return response.text();
   };
 
+  // hosted Stripe Checkout flow
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = e.currentTarget;
+    const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
 
-    // textarea length guard
-    const itemsDescription = (formData.get('itemsDescription') as string) || '';
-    if (itemsDescription.length > 500) {
+    // Validate textarea character limit
+    const itemsDescription = formData.get('itemsDescription') as string;
+    if (itemsDescription && itemsDescription.length > 500) {
       setSubmitStatus('Items description must be 500 characters or less.');
       setTimeout(() => setSubmitStatus(''), 3000);
       return;
@@ -38,60 +38,71 @@ export default function Home() {
 
     const data = Object.fromEntries(formData.entries());
 
-    // pricing calc
-    const prices: Record<string, number> = { 'early-bird': 20, regular: 30, 'day-of': 40 };
-    const basePrice = prices[data.registrationType as string] ?? 30;
-    const numberOfSpaces = parseInt((data.numberOfSpaces as string) || '1', 10);
+    // Calculate total amount based on registration type and number of spaces
+    const prices = { 'early-bird': 20, 'regular': 30, 'day-of': 40 } as const;
+    const basePrice = prices[(data.registrationType as keyof typeof prices) ?? 'regular'] ?? 30;
+    const numberOfSpaces = parseInt((data.numberOfSpaces as string) || '1', 10) || 1;
     const totalAmount = basePrice * numberOfSpaces;
 
-    // build processed payload for Readdy
-    const processed = new FormData();
-    processed.append('fullName', (data.fullName as string) || '');
-    processed.append('phone', (data.phone as string) || '');
-    processed.append('email', (data.email as string) || '');
-    processed.append('address', (data.address as string) || '');
+    // Build processed form for Readdy
+    const processedFormData = new FormData();
+    processedFormData.append('fullName', (data.fullName as string) || '');
+    processedFormData.append('phone', (data.phone as string) || '');
+    processedFormData.append('email', (data.email as string) || '');
+    processedFormData.append('address', (data.address as string) || '');
 
     const registrationTypeLabels: Record<string, string> = {
       'early-bird': 'Early Bird - $20 (First 20 vendors)',
-      regular: 'Regular - $30',
+      'regular': 'Regular - $30',
       'day-of': 'Day Of - $40',
     };
-    processed.append('registrationType', registrationTypeLabels[data.registrationType as string] || (data.registrationType as string));
+    processedFormData.append(
+      'registrationType',
+      registrationTypeLabels[data.registrationType as string] || (data.registrationType as string || '')
+    );
 
     const spacesLabels: Record<string, string> = {
       '1': '1 Space (10x12 ft)',
       '2': '2 Spaces (20x12 ft)',
       '3': '3 Spaces (30x12 ft)',
     };
-    processed.append('numberOfSpaces', spacesLabels[data.numberOfSpaces as string] || (data.numberOfSpaces as string));
+    processedFormData.append(
+      'numberOfSpaces',
+      spacesLabels[data.numberOfSpaces as string] || (data.numberOfSpaces as string || '1')
+    );
 
-    processed.append('itemsDescription', itemsDescription);
+    processedFormData.append('itemsDescription', (data.itemsDescription as string) || '');
 
-    if (data.agreeToRules === 'on') processed.append('agreeToRules', 'Agreed to follow all vendor rules and park regulations');
-    if (data.bringOwnSupplies === 'on') processed.append('bringOwnSupplies', 'Understands to bring own tables, blankets, and supplies');
+    if (data.agreeToRules === 'on') {
+      processedFormData.append('agreeToRules', 'Agreed to follow all vendor rules and park regulations');
+    }
+    if (data.bringOwnSupplies === 'on') {
+      processedFormData.append('bringOwnSupplies', 'Understands to bring own tables, blankets, and supplies');
+    }
 
-    processed.append('basePrice', `$${basePrice}`);
-    processed.append('totalAmount', `$${totalAmount}`);
+    processedFormData.append('basePrice', `$${basePrice}`);
+    processedFormData.append('totalAmount', `$${totalAmount}`);
 
+    // Submit the form first
     setSubmitStatus('Submitting registration...');
     try {
-      await submitFormData(processed);
-    } catch {
+      await submitFormData(processedFormData);
+    } catch (error) {
+      console.error('Form submission error:', error);
       setSubmitStatus('Form submission failed. Please try again.');
       setTimeout(() => setSubmitStatus(''), 3000);
       return;
     }
 
-    // 🔁 hosted Stripe Checkout redirect
+    // 👉 Redirect to Stripe Checkout
     setSubmitStatus('Redirecting to payment...');
     try {
       const res = await fetch('/api/create-checkout-session', { method: 'POST' });
-      const { url } = await res.json();
+      const { url, error } = await res.json();
       if (url) {
-        window.location.href = url;
+        window.location.href = url; // go to Stripe
       } else {
-        setSubmitStatus('Stripe checkout session failed.');
-        setTimeout(() => setSubmitStatus(''), 3000);
+        throw new Error(error || 'No Checkout URL returned');
       }
     } catch (err) {
       console.error(err);
@@ -102,13 +113,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-
-      {/* Hero */}
+      {/* Hero Section */}
       <section
         className="relative min-h-screen bg-cover bg-center bg-no-repeat flex items-center"
         style={{
           backgroundImage:
-            `linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,.4)), url('https://static.readdy.ai/image/aecfd129164522ee2281fe35b304d57e/665aa6117a2b7ba1938f9e5baed8eb57.jfif')`,
+            "linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,.4)), url('https://static.readdy.ai/image/aecfd129164522ee2281fe35b304d57e/665aa6117a2b7ba1938f9e5baed8eb57.jfif')",
         }}
       >
         <div className="w-full max-w-6xl mx-auto px-6">
@@ -117,26 +127,44 @@ export default function Home() {
             <p className="text-2xl mb-4 font-medium">A Day of Bargains and Community Spirit!</p>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 mb-8">
               <div className="flex flex-wrap gap-6 text-lg">
-                <div className="flex items-center gap-2"><i className="ri-calendar-line w-6 h-6"></i><span>Saturday, September 13, 2025</span></div>
-                <div className="flex items-center gap-2"><i className="ri-time-line w-6 h-6"></i><span>9 AM - 3 PM</span></div>
-                <div className="flex items-center gap-2"><i className="ri-map-pin-line w-6 h-6"></i><span>Sandstone Park</span></div>
+                <div className="flex items-center gap-2">
+                  <i className="ri-calendar-line w-6 h-6 flex items-center justify-center"></i>
+                  <span>Saturday, September 13, 2025</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <i className="ri-time-line w-6 h-6 flex items-center justify-center"></i>
+                  <span>9 AM - 3 PM</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <i className="ri-map-pin-line w-6 h-6 flex items-center justify-center"></i>
+                  <span>Sandstone Park</span>
+                </div>
               </div>
             </div>
             <div className="flex gap-4">
-              <button onClick={scrollToRegistration} className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-full text-lg font-semibold transition-colors">Register as Vendor</button>
-              <button className="border-2 border-white text-white hover:bg-white hover:text-gray-900 px-8 py-4 rounded-full text-lg font-semibold transition-colors">Learn More</button>
+              <button
+                onClick={scrollToRegistration}
+                className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-full text-lg font-semibold transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Register as Vendor
+              </button>
+              <button className="border-2 border-white text-white hover:bg-white hover:text-gray-900 px-8 py-4 rounded-full text-lg font-semibold transition-colors cursor-pointer whitespace-nowrap">
+                Learn More
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* About */}
+      {/* About Section */}
       <section className="py-20 bg-white">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-6">Join Our Very First Community Yard Sale!</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              The town of Lyons is buzzing with excitement as we prepare for our first Community Yard Sale! This isn’t just any yard sale—this is a chance to dig through those closets, dust off those treasures, and find new homes for items that have been patiently waiting for their moment to shine.
+              The town of Lyons is buzzing with excitement as we prepare for our first Community Yard Sale! This isn’t
+              just any yard sale—this is a chance to dig through those closets, dust off those treasures, and find new
+              homes for items that have been patiently waiting for their moment to shine.
             </p>
           </div>
 
@@ -151,7 +179,7 @@ export default function Home() {
             <div className="space-y-6">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <i className="ri-treasure-map-line w-6 h-6 text-blue-600"></i>
+                  <i className="ri-treasure-map-line w-6 h-6 flex items-center justify-center text-blue-600"></i>
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">Find Hidden Treasures</h3>
@@ -160,7 +188,7 @@ export default function Home() {
               </div>
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <i className="ri-community-line w-6 h-6 text-green-600"></i>
+                  <i className="ri-community-line w-6 h-6 flex items-center justify-center text-green-600"></i>
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">Build Community</h3>
@@ -169,7 +197,7 @@ export default function Home() {
               </div>
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <i className="ri-money-dollar-circle-line w-6 h-6 text-orange-600"></i>
+                  <i className="ri-money-dollar-circle-line w-6 h-6 flex items-center justify-center text-orange-600"></i>
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">Turn Clutter to Cash</h3>
@@ -181,7 +209,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Vendor Info */}
+      {/* Vendor Information */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
@@ -190,10 +218,9 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 mb-16">
-            {/* Pricing */}
             <div className="bg-white rounded-xl shadow-lg p-8">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i className="ri-price-tag-3-line w-8 h-8 text-blue-600"></i>
+                <i className="ri-price-tag-3-line w-8 h-8 flex items-center justify-center text-blue-600"></i>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">Pricing</h3>
               <div className="space-y-3">
@@ -212,61 +239,110 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Setup */}
             <div className="bg-white rounded-xl shadow-lg p-8">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i className="ri-time-line w-8 h-8 text-green-600"></i>
+                <i className="ri-time-line w-8 h-8 flex items-center justify-center text-green-600"></i>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">Setup Details</h3>
               <div className="space-y-4">
-                <div className="flex items-start gap-3"><i className="ri-arrow-right-line w-5 h-5 text-green-600 mt-1"></i><div><p className="font-semibold text-gray-900">Setup Time</p><p className="text-gray-600">Arrive as early as 7 AM</p></div></div>
-                <div className="flex items-start gap-3"><i className="ri-arrow-right-line w-5 h-5 text-green-600 mt-1"></i><div><p className="font-semibold text-gray-900">Tear Down</p><p className="text-gray-600">Must clear out by 4:30 PM</p></div></div>
-                <div className="flex items-start gap-3"><i className="ri-arrow-right-line w-5 h-5 text-green-600 mt-1"></i><div><p className="font-semibold text-gray-900">Space Size</p><p className="text-gray-600">10x12 feet per vendor</p></div></div>
+                <div className="flex items-start gap-3">
+                  <i className="ri-arrow-right-line w-5 h-5 flex items-center justify-center text-green-600 mt-1"></i>
+                  <div>
+                    <p className="font-semibold text-gray-900">Setup Time</p>
+                    <p className="text-gray-600">Arrive as early as 7 AM</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <i className="ri-arrow-right-line w-5 h-5 flex items-center justify-center text-green-600 mt-1"></i>
+                  <div>
+                    <p className="font-semibold text-gray-900">Tear Down</p>
+                    <p className="text-gray-600">Must clear out by 4:30 PM</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <i className="ri-arrow-right-line w-5 h-5 flex items-center justify-center text-green-600 mt-1"></i>
+                  <div>
+                    <p className="font-semibold text-gray-900">Space Size</p>
+                    <p className="text-gray-600">10x12 feet per vendor</p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Registration Card */}
             <div className="bg-white rounded-xl shadow-lg p-8">
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i className="ri-file-list-3-line w-8 h-8 text-orange-600"></i>
+                <i className="ri-file-list-3-line w-8 h-8 flex items-center justify-center text-orange-600"></i>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">Registration</h3>
               <div className="text-center">
                 <p className="text-gray-600 mb-6">Secure your vendor spot today and join our community event!</p>
-                <button onClick={scrollToRegistration} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-full font-semibold transition-colors w-full">Register Now</button>
+                <button
+                  onClick={scrollToRegistration}
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-full font-semibold transition-colors cursor-pointer whitespace-nowrap w-full"
+                >
+                  Register Now
+                </button>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Rules */}
-      <section className="py-20 bg-white">
+      {/* Rules Section */}
+      <section className="py-20 bg-white" id="rules">
         <div className="max-w-6xl mx-auto px-6">
           <h2 className="text-4xl font-bold text-gray-900 mb-12 text-center">Rules to Keep Us All Happy</h2>
 
           <div className="grid md:grid-cols-2 gap-12">
             <div className="bg-blue-50 rounded-xl p-8">
               <h3 className="text-2xl font-bold text-blue-900 mb-6 flex items-center gap-3">
-                <i className="ri-store-3-line w-8 h-8"></i> Vendor Rules
+                <i className="ri-store-3-line w-8 h-8 flex items-center justify-center"></i>
+                Vendor Rules
               </h3>
               <ul className="space-y-4">
-                <li className="flex items-start gap-3"><i className="ri-checkbox-circle-line w-6 h-6 text-blue-600 mt-0.5"></i><span className="text-gray-700">Check in at registration table before setting up to get your space number</span></li>
-                <li className="flex items-start gap-3"><i className="ri-close-circle-line w-6 h-6 text-red-500 mt-0.5"></i><span className="text-gray-700">No park trash or recycling disposal</span></li>
-                <li className="flex items-start gap-3"><i className="ri-close-circle-line w-6 h-6 text-red-500 mt-0.5"></i><span className="text-gray-700">No glass, alcohol, or pets allowed</span></li>
-                <li className="flex items-start gap-3"><i className="ri-close-circle-line w-6 h-6 text-red-500 mt-0.5"></i><span className="text-gray-700">No tents allowed - bring your own tables and blankets</span></li>
+                <li className="flex items-start gap-3">
+                  <i className="ri-checkbox-circle-line w-6 h-6 flex items-center justify-center text-blue-600 mt-0.5"></i>
+                  <span className="text-gray-700">
+                    Check in at registration table before setting up to get your space number
+                  </span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <i className="ri-close-circle-line w-6 h-6 flex items-center justify-center text-red-500 mt-0.5"></i>
+                  <span className="text-gray-700">No park trash or recycling disposal</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <i className="ri-close-circle-line w-6 h-6 flex items-center justify-center text-red-500 mt-0.5"></i>
+                  <span className="text-gray-700">No glass, alcohol, or pets allowed</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <i className="ri-close-circle-line w-6 h-6 flex items-center justify-center text-red-500 mt-0.5"></i>
+                  <span className="text-gray-700">No tents allowed - bring your own tables and blankets</span>
+                </li>
               </ul>
             </div>
 
             <div className="bg-green-50 rounded-xl p-8">
               <h3 className="text-2xl font-bold text-green-900 mb-6 flex items-center gap-3">
-                <i className="ri-leaf-line w-8 h-8"></i> Park Rules
+                <i className="ri-leaf-line w-8 h-8 flex items-center justify-center"></i>
+                Park Rules
               </h3>
               <ul className="space-y-4">
-                <li className="flex items-start gap-3"><i className="ri-close-circle-line w-6 h-6 text-red-500 mt-0.5"></i><span className="text-gray-700">No amplified music or stages</span></li>
-                <li className="flex items-start gap-3"><i className="ri-heart-line w-6 h-6 text-green-600 mt-0.5"></i><span className="text-gray-700">Keep the atmosphere peaceful and friendly</span></li>
-                <li className="flex items-start gap-3"><i className="ri-close-circle-line w-6 h-6 text-red-500 mt-0.5"></i><span className="text-gray-700">No glass, alcohol, or pets on premises</span></li>
-                <li className="flex items-start gap-3"><i className="ri-shield-check-line w-6 h-6 text-green-600 mt-0.5"></i><span className="text-gray-700">Follow all park regulations for everyone’s safety</span></li>
+                <li className="flex items-start gap-3">
+                  <i className="ri-close-circle-line w-6 h-6 flex items-center justify-center text-red-500 mt-0.5"></i>
+                  <span className="text-gray-700">No amplified music or stages</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <i className="ri-heart-line w-6 h-6 flex items-center justify-center text-green-600 mt-0.5"></i>
+                  <span className="text-gray-700">Keep the atmosphere peaceful and friendly</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <i className="ri-close-circle-line w-6 h-6 flex items-center justify-center text-red-500 mt-0.5"></i>
+                  <span className="text-gray-700">No glass, alcohol, or pets on premises</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <i className="ri-shield-check-line w-6 h-6 flex items-center justify-center text-green-600 mt-0.5"></i>
+                  <span className="text-gray-700">Follow all park regulations for everyone’s safety</span>
+                </li>
               </ul>
             </div>
           </div>
@@ -283,36 +359,72 @@ export default function Home() {
 
           <div className="bg-white rounded-xl shadow-2xl p-8">
             {submitStatus && (
-              <div className={`${submitStatus.includes('successful') ? 'bg-green-50 text-green-700' : submitStatus.includes('failed') ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'} p-4 rounded-lg mb-6 text-center`}>
+              <div
+                className={`${
+                  submitStatus.includes('successful')
+                    ? 'bg-green-50 text-green-700'
+                    : submitStatus.includes('failed')
+                    ? 'bg-red-50 text-red-700'
+                    : 'bg-blue-50 text-blue-700'
+                } p-4 rounded-lg mb-6 text-center`}
+              >
                 {submitStatus}
               </div>
             )}
 
-            <form id="vendor-registration" onSubmit={handleFormSubmit} className="space-y-6">
+            <form id="vendor-registration" data-readdy-form onSubmit={handleFormSubmit} className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
-                  <input type="text" name="fullName" required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" placeholder="Enter your full name" />
+                  <input
+                    type="text"
+                    name="fullName"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="Enter your full name"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number *</label>
-                  <input type="tel" name="phone" required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" placeholder="(555) 123-4567" />
+                  <input
+                    type="tel"
+                    name="phone"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="(555) 123-4567"
+                  />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address *</label>
-                <input type="email" name="email" required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" placeholder="your.email@example.com" />
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="your.email@example.com"
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Address *</label>
-                <input type="text" name="address" required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" placeholder="123 Main St, Lyons, CO" />
+                <input
+                  type="text"
+                  name="address"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="123 Main St, Lyons, CO"
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Registration Type *</label>
-                <select name="registrationType" required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm pr-8">
+                <select
+                  name="registrationType"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm pr-8"
+                >
                   <option value="">Select registration type</option>
                   <option value="early-bird">Early Bird - $20 (First 20 vendors)</option>
                   <option value="regular">Regular - $30</option>
@@ -322,7 +434,11 @@ export default function Home() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Number of Spaces</label>
-                <select name="numberOfSpaces" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm pr-8">
+                <select
+                  name="numberOfSpaces"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm pr-8"
+                  defaultValue="1"
+                >
                   <option value="1">1 Space (10x12 ft)</option>
                   <option value="2">2 Spaces (20x12 ft)</option>
                   <option value="3">3 Spaces (30x12 ft)</option>
@@ -337,17 +453,132 @@ export default function Home() {
                   maxLength={500}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
                   placeholder="Describe the types of items you plan to sell (max 500 characters)"
-                />
+                ></textarea>
                 <p className="text-xs text-gray-500 mt-1">Maximum 500 characters</p>
               </div>
 
               <div>
                 <label className="flex items-start gap-3">
                   <input type="checkbox" name="agreeToRules" required className="mt-1" />
-                  <span className="text-sm text-gray-700">I agree to follow all vendor rules and park regulations outlined above *</span>
+                  <span className="text-sm text-gray-700">
+                    I agree to follow all vendor rules and park regulations outlined above *
+                  </span>
                 </label>
               </div>
 
               <div>
                 <label className="flex items-start gap-3">
-                  <input type="checkbox"
+                  <input type="checkbox" name="bringOwnSupplies" required className="mt-1" />
+                  <span className="text-sm text-gray-700">
+                    I understand that I need to bring my own tables, blankets, and supplies (no tents allowed) *
+                  </span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={!!submitStatus}
+                className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white py-4 rounded-lg text-lg font-semibold transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
+              >
+                {submitStatus ? 'Processing…' : 'Continue to Payment'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20 bg-orange-500">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <h2 className="text-4xl font-bold text-white mb-6">Ready to Join the Fun?</h2>
+          <p className="text-xl text-orange-100 mb-8 max-w-3xl mx-auto">
+            Let’s turn those "I might use this someday" items into cash and create a vibrant community atmosphere. Join
+            us for a day of fun, laughter, and fantastic finds at the Lyons Community Yard Sale!
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={scrollToRegistration}
+              className="bg-white text-orange-500 hover:bg-gray-100 px-8 py-4 rounded-full text-lg font-semibold transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Register as Vendor
+            </button>
+            <Link
+              href="/admin"
+              className="border-2 border-white text-white hover:bg-white hover:text-orange-500 px-8 py-4 rounded-full text-lg font-semibold transition-colors whitespace-nowrap"
+            >
+              Admin Dashboard
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <h3 className="text-xl font-bold mb-4">Event Details</h3>
+              <div className="space-y-2 text-gray-300">
+                <p>Saturday, September 13, 2025</p>
+                <p>9:00 AM - 3:00 PM</p>
+                <p>Sandstone Park</p>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold mb-4">Quick Links</h3>
+              <div className="space-y-2">
+                <button
+                  onClick={scrollToRegistration}
+                  className="block text-left text-gray-300 hover:text-white transition-colors bg-transparent border-none cursor-pointer"
+                >
+                  Vendor Registration
+                </button>
+                <Link href="#rules" className="block text-gray-300 hover:text-white transition-colors">
+                  Rules &amp; Guidelines
+                </Link>
+                <Link href="#registration" className="block text-gray-300 hover:text-white transition-colors">
+                  Pricing Information
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-800 mt-8 pt-8">
+            <div className="bg-gray-800 rounded-lg p-6 mb-6">
+              <h3 className="text-lg font-bold mb-4 text-center flex items-center justify-center gap-2">
+                <i className="ri-heart-line w-6 h-6 flex items-center justify-center text-red-400"></i>
+                Where Your Registration Fees Go
+              </h3>
+              <div className="grid md:grid-cols-2 gap-6 text-sm">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <i className="ri-settings-line w-5 h-5 flex items-center justify-center text-blue-400"></i>
+                    <span className="text-gray-300">Event administration costs</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <i className="ri-music-line w-5 h-5 flex items-center justify-center text-green-400"></i>
+                    <span className="text-gray-300">Musicians performing at the event</span>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <i className="ri-calendar-event-line w-5 h-5 flex items-center justify-center text-orange-400"></i>
+                    <span className="text-gray-300">Future town events</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <i className="ri-graduation-cap-line w-5 h-5 flex items-center justify-center text-purple-400"></i>
+                    <span className="text-gray-300">Lyons High School Theatre Department</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center text-gray-400">
+            <p>&copy; 2025 Town of Lyons. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
