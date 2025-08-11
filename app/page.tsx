@@ -114,8 +114,11 @@ const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setSubmitStatus('Payment setup failed. Try again.');
     setTimeout(() => setSubmitStatus(''), 3000);
   }
-};
-      >
+}; // <-- end handleFormSubmit
+
+return (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+
         <div className="w-full max-w-6xl mx-auto px-6">
           <div className="text-white max-w-3xl">
             <h1 className="text-6xl font-bold mb-6 leading-tight">Lyons Community Yard Sale</h1>
