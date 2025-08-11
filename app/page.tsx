@@ -23,99 +23,98 @@ export default function Home() {
   };
 
   // Hosted Stripe Checkout flow
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
+const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  setSubmitStatus('');
+  const form = e.target as HTMLFormElement;
+  const formData = new FormData(form);
 
-    // Validate textarea character limit
-    const itemsDescription = formData.get('itemsDescription') as string;
-    if (itemsDescription && itemsDescription.length > 500) {
-      setSubmitStatus('Items description must be 500 characters or less.');
-      setTimeout(() => setSubmitStatus(''), 3000);
-      return;
-    }
+  // Validate textarea character limit
+  const itemsDescription = formData.get('itemsDescription') as string;
+  if (itemsDescription && itemsDescription.length > 500) {
+    setSubmitStatus('Items description must be 500 characters or less.');
+    setTimeout(() => setSubmitStatus(''), 3000);
+    return;
+  }
 
-    const data = Object.fromEntries(formData.entries());
+  const data = Object.fromEntries(formData.entries());
 
-    // Calculate total based on registration type and spaces
-    const prices = { 'early-bird': 20, 'regular': 30, 'day-of': 40 } as const;
-    const basePrice = prices[data.registrationType as keyof typeof prices] ?? 30;
-    const numberOfSpaces = parseInt((data.numberOfSpaces as string) || '1', 10);
-    const totalAmount = basePrice * numberOfSpaces;
+  // Calculate total based on registration type and spaces (for your email copy)
+  const prices = { 'early-bird': 20, regular: 30, 'day-of': 40 } as const;
+  const basePrice = prices[data.registrationType as keyof typeof prices] ?? 30;
+  const numberOfSpaces = parseInt((data.numberOfSpaces as string) || '1', 10);
+  const totalAmount = basePrice * numberOfSpaces;
 
-    // Build processed form for Readdy
-    const processedFormData = new FormData();
-    processedFormData.append('fullName', (data.fullName as string) || '');
-    processedFormData.append('phone', (data.phone as string) || '');
-    processedFormData.append('email', (data.email as string) || '');
-    processedFormData.append('address', (data.address as string) || '');
+  // Build processed form for Readdy (unchanged)
+  const processedFormData = new FormData();
+  processedFormData.append('fullName', (data.fullName as string) || '');
+  processedFormData.append('phone', (data.phone as string) || '');
+  processedFormData.append('email', (data.email as string) || '');
+  processedFormData.append('address', (data.address as string) || '');
 
-    const registrationTypeLabels: Record<string, string> = {
-      'early-bird': 'Early Bird - $20 (First 20 vendors)',
-      regular: 'Regular - $30',
-      'day-of': 'Day Of - $40',
-    };
-    processedFormData.append(
-      'registrationType',
-      registrationTypeLabels[data.registrationType as string] || (data.registrationType as string)
-    );
-
-    const spacesLabels: Record<string, string> = {
-      '1': '1 Space (10x12 ft)',
-      '2': '2 Spaces (20x12 ft)',
-      '3': '3 Spaces (30x12 ft)',
-    };
-    processedFormData.append(
-      'numberOfSpaces',
-      spacesLabels[data.numberOfSpaces as string] || (data.numberOfSpaces as string)
-    );
-
-    processedFormData.append('itemsDescription', ((data.itemsDescription as string) || '').slice(0, 500));
-    if (data.agreeToRules === 'on')
-      processedFormData.append('agreeToRules', 'Agreed to follow all vendor rules and park regulations');
-    if (data.bringOwnSupplies === 'on')
-      processedFormData.append('bringOwnSupplies', 'Understands to bring own tables, blankets, and supplies');
-    processedFormData.append('basePrice', `$${basePrice}`);
-    processedFormData.append('totalAmount', `$${totalAmount}`);
-
-    // 1) Submit the form
-    setSubmitStatus('Submitting registration...');
-    try {
-      await submitFormData(processedFormData);
-    } catch (err) {
-      console.error('Form submission error:', err);
-      setSubmitStatus('Form submission failed. Please try again.');
-      setTimeout(() => setSubmitStatus(''), 3000);
-      return;
-    }
-
-    // 2) Redirect to Stripe Checkout
-    setSubmitStatus('Redirecting to payment...');
-    try {
-      const res = await fetch('/api/create-checkout-session', { method: 'POST' });
-      const { url, error } = await res.json();
-      if (url) {
-        window.location.href = url; // go to Stripe
-      } else {
-        throw new Error(error || 'No Checkout URL returned');
-      }
-    } catch (err) {
-      console.error(err);
-      setSubmitStatus('Payment setup failed. Try again.');
-      setTimeout(() => setSubmitStatus(''), 3000);
-    }
+  const registrationTypeLabels: Record<string, string> = {
+    'early-bird': 'Early Bird - $20 (First 20 vendors)',
+    regular: 'Regular - $30',
+    'day-of': 'Day Of - $40',
   };
+  processedFormData.append(
+    'registrationType',
+    registrationTypeLabels[data.registrationType as string] || (data.registrationType as string)
+  );
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-      {/* Hero Section */}
-      <section
-        className="relative min-h-screen bg-cover bg-center bg-no-repeat flex items-center"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,.4)), url('https://static.readdy.ai/image/aecfd129164522ee2281fe35b304d57e/665aa6117a2b7ba1938f9e5baed8eb57.jfif')",
-        }}
+  const spacesLabels: Record<string, string> = {
+    '1': '1 Space (10x12 ft)',
+    '2': '2 Spaces (20x12 ft)',
+    '3': '3 Spaces (30x12 ft)',
+  };
+  processedFormData.append(
+    'numberOfSpaces',
+    spacesLabels[data.numberOfSpaces as string] || (data.numberOfSpaces as string)
+  );
+
+  processedFormData.append('itemsDescription', ((data.itemsDescription as string) || '').slice(0, 500));
+  if (data.agreeToRules === 'on')
+    processedFormData.append('agreeToRules', 'Agreed to follow all vendor rules and park regulations');
+  if (data.bringOwnSupplies === 'on')
+    processedFormData.append('bringOwnSupplies', 'Understands to bring own tables, blankets, and supplies');
+  processedFormData.append('basePrice', `$${basePrice}`);
+  processedFormData.append('totalAmount', `$${totalAmount}`);
+
+  // 1) Submit the form first
+  setSubmitStatus('Submitting registration...');
+  try {
+    await submitFormData(processedFormData);
+  } catch (err) {
+    console.error('Form submission error:', err);
+    setSubmitStatus('Form submission failed. Please try again.');
+    setTimeout(() => setSubmitStatus(''), 3000);
+    return;
+  }
+
+  // 2) Redirect to Stripe Checkout with selected tier + spaces
+  setSubmitStatus('Redirecting to payment...');
+  try {
+    const res = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        registrationType: data.registrationType,             // "early-bird" | "regular" | "day-of"
+        numberOfSpaces: Number(data.numberOfSpaces || 1),    // 1 | 2 | 3
+      }),
+    });
+
+    const { url, error } = await res.json();
+    if (url) {
+      window.location.href = url; // go to Stripe
+    } else {
+      throw new Error(error || 'No Checkout URL returned');
+    }
+  } catch (err) {
+    console.error(err);
+    setSubmitStatus('Payment setup failed. Try again.');
+    setTimeout(() => setSubmitStatus(''), 3000);
+  }
+};
       >
         <div className="w-full max-w-6xl mx-auto px-6">
           <div className="text-white max-w-3xl">
