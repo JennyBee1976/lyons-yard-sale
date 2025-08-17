@@ -91,30 +91,30 @@ export default function Home() {
       return;
     }
 
-    // 2) Redirect to Stripe Checkout with selected tier + spaces
-    setSubmitStatus('Redirecting to payment...');
-    try {
-      const res = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          registrationType: data.registrationType,           // "early-bird" | "regular" | "day-of"
-          numberOfSpaces: Number(data.numberOfSpaces || 1),  // 1 | 2 | 3
-        }),
-      });
+   // 2) Redirect to Stripe Checkout (send tier + quantity)
+setSubmitStatus("Redirecting to payment...");
+try {
+  const res = await fetch("/api/create-checkout-session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      registrationType: data.registrationType,          // "early-bird" | "regular" | "day-of"
+      numberOfSpaces: Number(data.numberOfSpaces || 1), // 1 | 2 | 3
+    }),
+  });
 
-      const { url, error } = await res.json();
-      if (url) {
-        window.location.href = url; // go to Stripe
-      } else {
-        throw new Error(error || 'No Checkout URL returned');
-      }
-    } catch (err) {
-      console.error(err);
-      setSubmitStatus('Payment setup failed. Try again.');
-      setTimeout(() => setSubmitStatus(''), 3000);
-    }
-  };
+  const { url, error } = await res.json();
+  if (url) {
+    window.location.href = url;
+    return;
+  }
+  throw new Error(error || "No Checkout URL returned");
+} catch (err) {
+  console.error("checkout", err);
+  setSubmitStatus("Payment setup failed. Try again.");
+  setTimeout(() => setSubmitStatus(""), 3000);
+}
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
