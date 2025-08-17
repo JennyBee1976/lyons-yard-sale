@@ -1,14 +1,11 @@
-
 // app/page.tsx
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 
 type TierKey = "early-bird" | "regular" | "day-of";
 
-// Labels for tiers (matches your pricing cards)
 const TIERS: { key: TierKey; label: string }[] = [
   { key: "early-bird", label: "Early Bird - $20 (First 20 vendors)" },
   { key: "regular", label: "Regular - $30" },
@@ -20,8 +17,14 @@ export default function Page() {
   const [quantity, setQuantity] = useState<number>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const params = useSearchParams();
-  const canceled = params.get("canceled");
+  const [canceled, setCanceled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("canceled")) setCanceled(true);
+    }
+  }, []);
 
   const handleCheckout = async () => {
     setError(null);
