@@ -23,7 +23,7 @@ export default function Home() {
   };
 
   // Hosted Stripe Checkout flow
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleFormSubmit = async (e: React.FormEventas HTMLFormElement) => {
     e.preventDefault();
     setSubmitStatus('');
     const form = e.currentTarget;
@@ -593,6 +593,9 @@ try {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
   );
+}
+
+
 }
