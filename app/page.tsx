@@ -91,7 +91,7 @@ export default function Home() {
       return;
     }
 
-// 2) Redirect to Stripe Checkout (send tier + quantity)
+// Redirect to Stripe Checkout (send tier + quantity)
 setSubmitStatus("Redirecting to payment...");
 try {
   const res = await fetch("/api/create-checkout-session", {
@@ -103,7 +103,6 @@ try {
     }),
   });
 
-  // Try to parse JSON either way (even when res.ok === false)
   let payload: any;
   try { payload = await res.json(); } catch { payload = await res.text(); }
 
@@ -116,7 +115,6 @@ try {
   if (!url) throw new Error(`No Checkout URL returned (${JSON.stringify(payload)})`);
 
   window.location.href = url;
-  return;
 } catch (err: any) {
   console.error("checkout", err);
   setSubmitStatus(`Payment setup failed: ${err?.message || String(err)}`);
