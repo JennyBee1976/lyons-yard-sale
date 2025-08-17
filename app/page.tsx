@@ -594,6 +594,7 @@ try {
         </div>
       </footer>
       </div>
+      </>
   );
 }
 

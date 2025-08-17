@@ -1,15 +1,14 @@
-// app/api/create-checkout-session/route.ts
+
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripeSecret = process.env.STRIPE_SECRET_KEY; // must be LIVE when you want live charges
-const stripe = stripeSecret ? new Stripe(stripeSecret, { apiVersion: "2025-07-30.basil" }) : null;
+const stripeSecret = process.env.STRIPE_SECRET_KEY;
+const stripe = stripeSecret ? new Stripe(stripeSecret, { apiVersion: "2022-11-15" }) : null;
 
-// LIVE price IDs you gave me
 const PRICE_IDS = {
-  "early-bird": "price_1RvkViGXgSGc7Z9QjmDEcl1G", // $20
-  "regular":    "price_1RvkWSGXgSGc7Z9QU2vg8Ahp", // $30
-  "day-of":     "price_1RvkX7GXgSGc7Z9QVwdlMF84", // $40
+  "early-bird": "price_1RvkViGXgSGc7Z9QjmDEcl1G",
+  "regular": "price_1RvkWSGXgSGc7Z9QU2vg8Ahp",
+  "day-of": "price_1RvkX7GXgSGc7Z9QVwdlMF84",
 } as const;
 
 export async function POST(request: Request) {
@@ -43,19 +42,16 @@ export async function POST(request: Request) {
       success_url: `${origin}/success`,
       cancel_url: `${origin}/cancel`,
       automatic_tax: { enabled: false },
-      // metadata: { registrationType, numberOfSpaces: String(qty) }, // optional
     });
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
-    // Surface Stripe’s message if present
     const msg = err?.raw?.message || err?.message || "Failed to create checkout session";
     console.error("checkout error:", err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
-// simple ping for GET (handy for curl tests)
 export async function GET() {
   return NextResponse.json({ ok: true });
 }
