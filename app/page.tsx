@@ -1,95 +1,101 @@
-'use client';
+// app/page.tsx
+"use client";
 
-import Link from 'next/link';
-import { useState } from 'react';
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-export default function Home() {
-  const [submitStatus, setSubmitStatus] = useState('');
+type TierKey = "basic" | "premium" | "vip";
 
-  const scrollToRegistration = () => {
-    const el = document.getElementById('registration');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
+// Labels only (doesn't expose live price IDs)
+const TIERS: { key: TierKey; label: string }[] = [
+  { key: "basic", label: "Basic" },
+  { key: "premium", label: "Premium" },
+  { key: "vip", label: "VIP" },
+];
 
-  // submits to your Readdy form endpoint first
-  const submitFormData = async (formData: FormData) => {
-    const response = await fetch('https://readdy.ai/api/form/d26n70qelq606pbtooeg', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(formData as any).toString(),
-    });
-    if (!response.ok) throw new Error('Form submission failed');
-    return response.text();
-  };
+export default function Page() {
+  const [tier, setTier] = useState<TierKey>("basic");
+  const [quantity, setQuantity] = useState<number>(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const params = useSearchParams();
+  const canceled = params.get("canceled");
 
-  // Hosted Stripe Checkout flow
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSubmitStatus('');
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-
-    // Validate textarea character limit
-    const itemsDescription = (formData.get('itemsDescription') as string) || '';
-    if (itemsDescription.length > 500) {
-      setSubmitStatus('Items description must be 500 characters or less.');
-      setTimeout(() => setSubmitStatus(''), 3000);
-      return;
-    }
-
-    const data = Object.fromEntries(formData.entries());
-
-    // Calculate total (for your email copy only)
-    const prices = { 'early-bird': 20, regular: 30, 'day-of': 40 } as const;
-    const basePrice = prices[data.registrationType as keyof typeof prices] ?? 30;
-    const numberOfSpaces = parseInt((data.numberOfSpaces as string) || '1', 10);
-    const totalAmount = basePrice * numberOfSpaces;
-
-    // Build processed form for Readdy
-    const processedFormData = new FormData();
-    processedFormData.append('fullName', (data.fullName as string) || '');
-    processedFormData.append('phone', (data.phone as string) || '');
-    processedFormData.append('email', (data.email as string) || '');
-    processedFormData.append('address', (data.address as string) || '');
-
-    const registrationTypeLabels: Record<string, string> = {
-      'early-bird': 'Early Bird - $20 (First 20 vendors)',
-      regular: 'Regular - $30',
-      'day-of': 'Day Of - $40',
-    };
-    processedFormData.append(
-      'registrationType',
-      registrationTypeLabels[data.registrationType as string] || (data.registrationType as string)
-    );
-
-    const spacesLabels: Record<string, string> = {
-      '1': '1 Space (10x12 ft)',
-      '2': '2 Spaces (20x12 ft)',
-      '3': '3 Spaces (30x12 ft)',
-    };
-    processedFormData.append(
-      'numberOfSpaces',
-      spacesLabels[data.numberOfSpaces as string] || (data.numberOfSpaces as string)
-    );
-
-    processedFormData.append('itemsDescription', itemsDescription.slice(0, 500));
-    if (data.agreeToRules === 'on')
-      processedFormData.append('agreeToRules', 'Agreed to follow all vendor rules and park regulations');
-    if (data.bringOwnSupplies === 'on')
-      processedFormData.append('bringOwnSupplies', 'Understands to bring own tables, blankets, and supplies');
-    processedFormData.append('basePrice', `$${basePrice}`);
-    processedFormData.append('totalAmount', `$${totalAmount}`);
-
-    // 1) Submit the form first
-    setSubmitStatus('Submitting registration...');
+  const handleCheckout = async () => {
+    setError(null);
+    setLoading(true);
     try {
-      await submitFormData(processedFormData);
-    } catch (err) {
-      console.error('Form submission error:', err);
-      setSubmitStatus('Form submission failed. Please try again.');
-      setTimeout(() => setSubmitStatus(''), 3000);
-      return;
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier, quantity }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to create session");
+      if (!data?.url) throw new Error("No checkout URL returned from API");
+      window.location.href = data.url;
+    } catch (e: any) {
+      setError(e?.message || "Something went wrong");
+      setLoading(false);
     }
+  };
+
+  return (
+    <main className="mx-auto max-w-3xl p-6">
+      <h1 className="text-3xl font-bold">Lyons Community Yard Sale</h1>
+      <p className="mt-2">Choose your option and quantity to pay securely.</p>
+
+      {canceled && (
+        <p className="mt-3 rounded bg-yellow-50 p-3 text-yellow-800">
+          Checkout canceled. You can try again below.
+        </p>
+      )}
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block font-medium">Option</span>
+          <select
+            value={tier}
+            onChange={(e) => setTier(e.target.value as TierKey)}
+            className="w-full rounded border px-3 py-2"
+          >
+            {TIERS.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block font-medium">Quantity</span>
+          <select
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
+            className="w-full rounded border px-3 py-2"
+          >
+            {[1, 2, 3].map((q) => (
+              <option key={q} value={q}>
+                {q}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <button
+        onClick={handleCheckout}
+        disabled={loading}
+        className="mt-6 rounded bg-black px-5 py-3 text-white disabled:opacity-60"
+      >
+        {loading ? "Redirecting…" : "Pay Now"}
+      </button>
+
+      {error && <p className="mt-3 text-red-600">{error}</p>}
+    </main>
+  );
+}
+
 
 // Redirect to Stripe Checkout (send tier + quantity)
 setSubmitStatus("Redirecting to payment...");

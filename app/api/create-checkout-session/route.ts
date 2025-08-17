@@ -1,57 +1,69 @@
-
-import { NextResponse } from "next/server";
+// app/api/create-checkout-session/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripeSecret = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecret ? new Stripe(stripeSecret, { apiVersion: "2022-11-15" }) : null;
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const PRICE_IDS = {
-  "early-bird": "price_1RvkViGXgSGc7Z9QjmDEcl1G",
-  "regular": "price_1RvkWSGXgSGc7Z9QU2vg8Ahp",
-  "day-of": "price_1RvkX7GXgSGc7Z9QVwdlMF84",
+// Read env once
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, ""); // trim trailing slash
+
+const PRICE_MAP = {
+  basic: process.env.STRIPE_PRICE_ID_BASIC,
+  premium: process.env.STRIPE_PRICE_ID_PREMIUM,
+  vip: process.env.STRIPE_PRICE_ID_VIP,
 } as const;
 
-export async function POST(request: Request) {
+function assertEnv() {
+  const missing: string[] = [];
+  if (!process.env.STRIPE_SECRET_KEY) missing.push("STRIPE_SECRET_KEY");
+  if (!process.env.NEXT_PUBLIC_SITE_URL) missing.push("NEXT_PUBLIC_SITE_URL");
+  (["basic", "premium", "vip"] as const).forEach((k) => {
+    if (!PRICE_MAP[k]) missing.push(`STRIPE_PRICE_ID_${k.toUpperCase()}`);
+  });
+  return missing;
+}
+
+export async function POST(req: NextRequest) {
   try {
-    if (!stripe) {
+    const missing = assertEnv();
+    if (missing.length) {
       return NextResponse.json(
-        { error: "Missing STRIPE_SECRET_KEY (set LIVE key in Vercel)." },
+        { error: `Missing env vars: ${missing.join(", ")}` },
         { status: 500 }
       );
     }
 
-    const body = await request.json().catch(() => ({}));
-    const registrationType = String(body.registrationType || "");
-    const price = (PRICE_IDS as any)[registrationType];
+    const { tier, quantity } = await req.json();
 
-    if (!price) {
+    // Validate tier
+    if (!tier || !PRICE_MAP[tier as keyof typeof PRICE_MAP]) {
       return NextResponse.json(
-        { error: `Unknown registrationType "${registrationType}".` },
+        { error: "Invalid or missing 'tier'. Must be one of: basic, premium, vip." },
         { status: 400 }
       );
     }
 
-    const qtyRaw = Number(body.numberOfSpaces);
-    const qty = Math.max(1, Math.min(3, Number.isFinite(qtyRaw) ? qtyRaw : 1));
+    // Validate quantity (1–3)
+    const qtyNum = Number(quantity);
+    const qty = [1, 2, 3].includes(qtyNum) ? qtyNum : 1;
 
-    const origin = process.env.NEXT_PUBLIC_DOMAIN || new URL(request.url).origin;
-
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price, quantity: qty }],
-      success_url: `${origin}/success`,
-      cancel_url: `${origin}/cancel`,
-      automatic_tax: { enabled: false },
+      line_items: [{ price: PRICE_MAP[tier as keyof typeof PRICE_MAP]!, quantity: qty }],
+      success_url: `${SITE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${SITE_URL}/?canceled=1`,
+      allow_promotion_codes: true,
     });
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: session.url }, { status: 200 });
   } catch (err: any) {
-    const msg = err?.raw?.message || err?.message || "Failed to create checkout session";
-    console.error("checkout error:", err);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error("Stripe session error:", err);
+    return NextResponse.json({ error: err?.message ?? "Internal error" }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ error: "Method Not Allowed" }, { status: 405 });
 }
