@@ -7,9 +7,9 @@ const stripe = stripeSecret ? new Stripe(stripeSecret, { apiVersion: "2025-07-30
 
 // LIVE price IDs you gave me
 const PRICE_IDS = {
-  "early-bird": "price_1Rtz0iGtFjZNBwkUekNWEm04", // $20
-  "regular":    "price_1Rv1GUGtFjZNBwkUoWGnj6I1", // $30
-  "day-of":     "price_1Rv1MGGtFjZNBwkUpLoYVKq6", // $40
+  "early-bird": "price_1RvkViGXgSGc7Z9QjmDEcl1G", // $20
+  "regular":    "price_1RvkWSGXgSGc7Z9QU2vg8Ahp", // $30
+  "day-of":     "price_1RvkX7GXgSGc7Z9QVwdlMF84", // $40
 } as const;
 
 export async function POST(request: Request) {
