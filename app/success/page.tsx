@@ -1,11 +1,14 @@
+
 // app/success/page.tsx
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function SuccessPage() {
+function SuccessInner() {
   const params = useSearchParams();
   const sessionId = params.get("session_id");
+
   return (
     <main className="mx-auto max-w-3xl p-6">
       <h1 className="text-2xl font-semibold">Payment successful 🎉</h1>
@@ -14,5 +17,13 @@ export default function SuccessPage() {
         Go back home
       </a>
     </main>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={<main className=\"mx-auto max-w-3xl p-6\"><p>Loading...</p></main>}>
+      <SuccessInner />
+    </Suspense>
   );
 }
