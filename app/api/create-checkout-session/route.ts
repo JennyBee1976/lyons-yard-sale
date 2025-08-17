@@ -1,4 +1,5 @@
 // app/api/create-checkout-session/route.ts
+// app/api/create-checkout-session/route.ts
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
@@ -6,11 +7,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-07-30.basil",
 });
 
-// map your real Price IDs
+// LIVE price IDs only:
 const PRICE_IDS: Record<string, string> = {
   "early-bird": "price_1Rtz0iGtFjZNBwkUekNWEm04", // $20
-  regular:      "price_1Rv1GUGtFjZNBwkUoWGnj6I1", // $30
-  "day-of":     "price_1Rv1MGGtFjZNBwkUpLoYVKq6", // $40
+  regular:     "price_1Rv1GUGtFjZNBwkUoWGnj6I1",   // $30
+  "day-of":    "price_1Rv1MGGtFjZNBwkUpLoYVKq6",   // $40
 };
 
 export async function POST(request: Request) {
@@ -18,18 +19,16 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const registrationType = String(body.registrationType || "regular");
     const price = PRICE_IDS[registrationType] || PRICE_IDS["regular"];
-
     const qty = Math.max(1, Math.min(3, Number(body.numberOfSpaces || 1)));
 
-    const origin =
-      process.env.NEXT_PUBLIC_DOMAIN || new URL(request.url).origin;
+    const origin = process.env.NEXT_PUBLIC_DOMAIN || new URL(request.url).origin;
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [{ price, quantity: qty }],
       success_url: `${origin}/success`,
       cancel_url: `${origin}/cancel`,
-      automatic_tax: { enabled: false },
+      // metadata: { registrationType, numberOfSpaces: String(qty) },
     });
 
     return NextResponse.json({ url: session.url });
@@ -41,6 +40,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 // simple health check (helps when you curl GET)
 export async function GET() {
