@@ -19,3 +19,6 @@ supabase/
 # misc
 app/page.backup.tsx
 
+.next
+node_modules
+supabase/*

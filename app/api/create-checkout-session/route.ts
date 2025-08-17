@@ -1,3 +1,4 @@
+
 // app/api/create-checkout-session/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
@@ -5,21 +6,22 @@ import Stripe from "stripe";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Read env once
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, ""); // trim trailing slash
+const stripeSecret = process.env.STRIPE_SECRET_KEY;
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/+$/, "");
 
+// Map registration tiers to price IDs in env vars
 const PRICE_MAP = {
-  basic: process.env.STRIPE_PRICE_ID_BASIC,
-  premium: process.env.STRIPE_PRICE_ID_PREMIUM,
-  vip: process.env.STRIPE_PRICE_ID_VIP,
+  "early-bird": process.env.STRIPE_PRICE_ID_EARLY_BIRD,
+  "regular": process.env.STRIPE_PRICE_ID_REGULAR,
+  "day-of": process.env.STRIPE_PRICE_ID_DAY_OF,
 } as const;
 
 function assertEnv() {
   const missing: string[] = [];
-  if (!process.env.STRIPE_SECRET_KEY) missing.push("STRIPE_SECRET_KEY");
+  if (!stripeSecret) missing.push("STRIPE_SECRET_KEY");
   if (!process.env.NEXT_PUBLIC_SITE_URL) missing.push("NEXT_PUBLIC_SITE_URL");
-  (["basic", "premium", "vip"] as const).forEach((k) => {
-    if (!PRICE_MAP[k]) missing.push(`STRIPE_PRICE_ID_${k.toUpperCase()}`);
+  (["early-bird", "regular", "day-of"] as const).forEach((k) => {
+    if (!PRICE_MAP[k]) missing.push(`STRIPE_PRICE_ID_${k.replace("-", "_").toUpperCase()}`);
   });
   return missing;
 }
@@ -36,19 +38,17 @@ export async function POST(req: NextRequest) {
 
     const { tier, quantity } = await req.json();
 
-    // Validate tier
     if (!tier || !PRICE_MAP[tier as keyof typeof PRICE_MAP]) {
       return NextResponse.json(
-        { error: "Invalid or missing 'tier'. Must be one of: basic, premium, vip." },
+        { error: "Invalid or missing 'tier'. Must be one of: early-bird, regular, day-of." },
         { status: 400 }
       );
     }
 
-    // Validate quantity (1–3)
     const qtyNum = Number(quantity);
     const qty = [1, 2, 3].includes(qtyNum) ? qtyNum : 1;
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+    const stripe = new Stripe(stripeSecret!);
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [{ price: PRICE_MAP[tier as keyof typeof PRICE_MAP]!, quantity: qty }],
