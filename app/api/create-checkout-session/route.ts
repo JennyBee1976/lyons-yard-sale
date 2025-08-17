@@ -6,11 +6,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-07-30.basil",
 });
 
-// Map your tiers to Stripe Price IDs
+// map your real Price IDs
 const PRICE_IDS: Record<string, string> = {
   "early-bird": "price_1Rtz0iGtFjZNBwkUekNWEm04", // $20
-  regular: "price_1Rv1GUGtFjZNBwkUoWGnj6I1",       // $30
-  "day-of": "price_1Rv1MGGtFjZNBwkUpLoYVKq6",      // $40
+  regular:      "price_1Rv1GUGtFjZNBwkUoWGnj6I1", // $30
+  "day-of":     "price_1Rv1MGGtFjZNBwkUpLoYVKq6", // $40
 };
 
 export async function POST(request: Request) {
@@ -19,10 +19,8 @@ export async function POST(request: Request) {
     const registrationType = String(body.registrationType || "regular");
     const price = PRICE_IDS[registrationType] || PRICE_IDS["regular"];
 
-    // clamp quantity between 1 and 3
     const qty = Math.max(1, Math.min(3, Number(body.numberOfSpaces || 1)));
 
-    // prefer env domain, else infer from request
     const origin =
       process.env.NEXT_PUBLIC_DOMAIN || new URL(request.url).origin;
 
@@ -31,15 +29,14 @@ export async function POST(request: Request) {
       line_items: [{ price, quantity: qty }],
       success_url: `${origin}/success`,
       cancel_url: `${origin}/cancel`,
-      // optional: include some metadata
-      // metadata: { registrationType, numberOfSpaces: String(qty) },
+      automatic_tax: { enabled: false },
     });
 
     return NextResponse.json({ url: session.url });
-  } catch (err) {
-    console.error("Stripe error:", err);
+  } catch (err: any) {
+    console.error("checkout error:", err);
     return NextResponse.json(
-      { error: "Stripe checkout session creation failed." },
+      { error: err?.message || "Failed to create checkout session" },
       { status: 500 }
     );
   }
